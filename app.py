@@ -34,50 +34,49 @@ def create_app():
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
-            user = User.query.filter_by(username=username).first()
-            print(user)
-            if user and user.check_password(password):  # Предполагается, что у модели User есть метод check_password
-                print('ПРОШЛА!!!!')
-                login_user(user)
-                flash('Login successful', 'success')
-                return redirect(url_for('admin.index'))  # Перенаправление в админку
-            else:
-                flash('Invalid username or password', 'danger')
-
-        return render_template('login.html')  # Убедитесь, что шаблон login.html существует
+            username = request.form.get('username')
+            password = request.form.get('password')
+            try:
+                user = User.query.filter_by(username=username).first()
+                if user and user.check_password(password):
+                    login_user(user)
+                    flash('Login successful', 'success')
+                    return redirect(url_for('admin.index'))
+                else:
+                    flash('Invalid username or password', 'danger')
+            except Exception as e:
+                flash(f"An error occurred: {e}", 'danger')
+        return render_template('login.html')
     
     # Маршрут для регистрации
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
-            confirm_password = request.form['confirm_password']
+            username = request.form.get('username')
+            password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
 
-            # Проверка, что пароли совпадают
             if password != confirm_password:
                 flash('Passwords do not match', 'danger')
                 return redirect(url_for('register'))
 
-            # Проверка, что пользователь с таким именем не существует
             user = User.query.filter_by(username=username).first()
             if user:
                 flash('Username already exists', 'danger')
                 return redirect(url_for('register'))
 
-            # Создание нового пользователя
-            new_user = User(username=username)
-            new_user.set_password(password)  # Убедитесь, что у вас есть метод set_password в модели User
-            db.session.add(new_user)
-            db.session.commit()
+            try:
+                new_user = User(username=username)
+                new_user.set_password(password)
+                db.session.add(new_user)
+                db.session.commit()
+                login_user(new_user)
+                flash('Registration successful', 'success')
+                return redirect(url_for('admin.index'))
+            except Exception as e:
+                flash(f"An error occurred: {e}", 'danger')
+                db.session.rollback()
 
-            # Вход в систему после регистрации
-            login_user(new_user)
-            flash('Registration successful', 'success')
-            return redirect(url_for('admin.index'))  # Перенаправление в админку или на другую страницу
-        
         return render_template('register.html')
 
     # Создание базы данных

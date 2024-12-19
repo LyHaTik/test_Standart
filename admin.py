@@ -5,7 +5,7 @@ from flask_admin import Admin, expose, base
 from wtforms import SelectField
 from datetime import datetime
 
-from models import User, Transaction, UserRole, db
+from models import User, Transaction, db
 
 CHOISE_STATUS = [
             ('pending', 'Pending'),
@@ -13,6 +13,11 @@ CHOISE_STATUS = [
             ('canceled', 'Canceled'),
             ('expired', 'Expired'),
         ]
+
+CHOISE_ROLE = [
+    ('admin', 'Admin'),
+    ('regular', 'Regular'),
+    ]
 
 class DashboardView(base.BaseView):
     @expose('/')
@@ -38,24 +43,35 @@ class BaseModelView(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated
 
-    def inaccessible_callback(self, username, **kwargs):
+    def inaccessible_callback(self, **kwargs):
         return redirect(url_for('login'))
 
 class UserAdmin(BaseModelView):
     column_list = ['username', 'role', 'balance', 'commission_rate', 'webhook_url']
+
     can_create = False
     can_edit = True
     can_delete = True
     
+    form_overrides = {
+        'role': SelectField
+    }
+    
+    form_args = {
+        'role': {
+            'choices': CHOISE_ROLE
+        }
+    }
+    
     # Фильтрация пользователей для обычных пользователей (REGULAR)
     def get_query(self):
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == 'admin':
             return super().get_query()  # Для администратора - все пользователи
         return super().get_query().filter(User.id == current_user.id)  # Для обычного пользователя - только свой
 
     # Для правильного отображения количества записей в таблице
     def get_count_query(self):
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == 'admin':
             return super().get_count_query()  # Для администратора - все пользователи
         return super().get_count_query().filter(User.id == current_user.id)  # Для обычного пользователя - только свой
 
@@ -116,20 +132,20 @@ class TransactionAdmin(BaseModelView):
         if is_created:
             if current_user.is_authenticated:
                 model.user_id = current_user.id
-                model.commission = current_user.commission_rate
+                model.commission = float(model.amount) * float(current_user.commission_rate)
             else:
                 raise Exception("Пользователь не аутентифицирован. Невозможно установить user_id.")
         return super().on_model_change(form, model, is_created)
     
     # Фильтрация транзакций для обычных пользователей (REGULAR)
     def get_query(self):
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == 'admin':
             return super().get_query()  # Для администратора - все транзакции
         return super().get_query().filter(Transaction.user_id == current_user.id)  # Для обычного пользователя - только свои транзакции
 
     # Для правильного отображения количества записей в таблице
     def get_count_query(self):
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == 'admin':
             return super().get_count_query()  # Для администратора - все транзакции
         return super().get_count_query().filter(Transaction.user_id == current_user.id)  # Для обычного пользователя - только свои транзакции
     
