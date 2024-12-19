@@ -8,11 +8,12 @@ db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
+    
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), nullable=False)
     role = db.Column(db.String(50), default='regular', nullable=False)
     balance = db.Column(db.Float, default=0.0)
-    commission_rate = db.Column(db.Float, default=0.02)  # 2% комиссия
+    commission_rate = db.Column(db.Float, default=0.03)
     webhook_url = db.Column(db.String(255))
     
     # Поле для хранения хэша пароля
@@ -24,7 +25,7 @@ class User(UserMixin, db.Model):
 
     # Метод для проверки пароля
     def check_password(self, password):
-        return check_password_hash(self._password_hash, password)
+        return check_password_hash(self.password_hash, password)
     
     def is_admin(self):
         return self.role == 'admin'
@@ -40,6 +41,7 @@ class User(UserMixin, db.Model):
 
 class Transaction(db.Model):
     __tablename__ = 'transactions'
+    
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -47,9 +49,6 @@ class Transaction(db.Model):
     commission = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(50), default='pending', nullable=False)  # Используем строки
     user = db.relationship('User', backref='transactions')
-    
-    def formatted_time(self):
-        return self.created_at.strftime('%Y-%m-%d %H:%M:%S')
 
     def __str__(self):
         return f'Transaction({self.id}, User: {self.user_id}, Amount: {self.amount}, Status: {self.status})'

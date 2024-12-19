@@ -40,12 +40,12 @@ def create_app():
                 user = User.query.filter_by(username=username).first()
                 if user and user.check_password(password):
                     login_user(user)
-                    flash('Login successful', 'success')
+                    flash('Успешный вход', 'success')
                     return redirect(url_for('admin.index'))
                 else:
-                    flash('Invalid username or password', 'danger')
+                    flash('Не верный логин или пароль', 'danger')
             except Exception as e:
-                flash(f"An error occurred: {e}", 'danger')
+                flash(f"Ошибка: {e}", 'danger')
         return render_template('login.html')
     
     # Маршрут для регистрации
@@ -57,12 +57,12 @@ def create_app():
             confirm_password = request.form.get('confirm_password')
 
             if password != confirm_password:
-                flash('Passwords do not match', 'danger')
+                flash('Разные пароли!', 'danger')
                 return redirect(url_for('register'))
 
             user = User.query.filter_by(username=username).first()
             if user:
-                flash('Username already exists', 'danger')
+                flash(f'Имя {username} уже существует', 'danger')
                 return redirect(url_for('register'))
 
             try:
@@ -71,10 +71,10 @@ def create_app():
                 db.session.add(new_user)
                 db.session.commit()
                 login_user(new_user)
-                flash('Registration successful', 'success')
+                flash('Успешная регистрация', 'success')
                 return redirect(url_for('admin.index'))
             except Exception as e:
-                flash(f"An error occurred: {e}", 'danger')
+                flash(f"Ошибка: {e}", 'danger')
                 db.session.rollback()
 
         return render_template('register.html')

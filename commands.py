@@ -5,12 +5,12 @@ admin_cli = AppGroup('admin')
 
 @admin_cli.command('create-admin')
 def create_admin():
-    username = 'Admin'
+    username = input('Введите username: ')
+    password = input('Введите пароль: ')
     role = 'admin'
-    password = 'admin'
     
     admin_user = User(username=username, role=role, balance=0, commission_rate=0)
-    admin_user.set_password(password)  # Используйте метод set_password
+    admin_user.set_password(password)
     db.session.add(admin_user)
     db.session.commit()
-    print(f'Admin name: {username} password: {password} создан.')
+    print(f'Admin name: {username}\npassword: {password} создан.')

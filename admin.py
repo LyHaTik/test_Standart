@@ -7,6 +7,7 @@ from datetime import datetime
 
 from models import User, Transaction, db
 
+
 CHOISE_STATUS = [
             ('pending', 'Pending'),
             ('confirmed', 'Confirmed'),
@@ -39,12 +40,14 @@ class DashboardView(base.BaseView):
         return self.render('admin/dashboard.html', user_count=user_count, transaction_count=transaction_count, 
                            daily_total=daily_total, last_transactions=last_transactions)
 
+
 class BaseModelView(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated
 
-    def inaccessible_callback(self, **kwargs):
+    def inaccessible_callback(self, username, **kwargs):
         return redirect(url_for('login'))
+
 
 class UserAdmin(BaseModelView):
     column_list = ['username', 'role', 'balance', 'commission_rate', 'webhook_url']
@@ -52,6 +55,8 @@ class UserAdmin(BaseModelView):
     can_create = False
     can_edit = True
     can_delete = True
+    
+    form_excluded_columns = ['password_hash']
     
     form_overrides = {
         'role': SelectField
@@ -75,6 +80,7 @@ class UserAdmin(BaseModelView):
             return super().get_count_query()  # Для администратора - все пользователи
         return super().get_count_query().filter(User.id == current_user.id)  # Для обычного пользователя - только свой
 
+
 class UserFilter(filters.BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(Transaction.user_id == value)
@@ -87,6 +93,7 @@ class UserFilter(filters.BaseSQLAFilter):
         users = view.session.query(User.id, User.username).join(Transaction).distinct().all()
         return [(user.id, user.username) for user in users]
 
+
 class StatusFilter(filters.BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(Transaction.status == value)
@@ -98,30 +105,22 @@ class StatusFilter(filters.BaseSQLAFilter):
         # Опции статусов
         return CHOISE_STATUS
 
+
 class TransactionAdmin(BaseModelView):
     column_list = ['created_at', 'user.username', 'amount', 'commission', 'status']
-
-    # Поля, которые будут отображаться в форме
     form_columns = ['amount', 'status']
-    # Исключаем из формы поле user_id
     form_excluded_columns = ['user_id']
-    
     form_overrides = {
         'status': SelectField
     }
-    
-    # Фильтры для админки
     column_filters = [
         UserFilter(Transaction.user_id, 'User'),
         StatusFilter(Transaction.status, 'Status'),
     ]
-
-    # Отображаемое имя для поля user_id в фильтре
     column_labels = {
         'user.username': 'User',
         'status': 'Status'
     }
-    
     form_args = {
         'status': {
             'choices': CHOISE_STATUS
