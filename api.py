@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required, login_user
-from flask_restx import Api, Resource, fields
 
 from models import Transaction, db, User
 

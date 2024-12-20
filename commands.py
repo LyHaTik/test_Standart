@@ -1,5 +1,7 @@
 from flask.cli import AppGroup
+
 from models import db, User
+
 
 admin_cli = AppGroup('admin')
 

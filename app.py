@@ -1,13 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user
 from flasgger import Swagger
+from api import api_blueprint
 
 from models import User, db
 from admin import admin, setup_admin
+from commands import admin_cli
 
 
 login_manager = LoginManager()
-
 login_manager.login_view = "login"
 
 @login_manager.user_loader
@@ -24,15 +25,29 @@ def create_app():
     admin.init_app(app)
 
     # Регистрация модулей
-    from api import api_blueprint
     app.register_blueprint(api_blueprint, url_prefix='/api')
     
     # Инициализация Swagger
     Swagger(app)
     
     # Регистрация команд CLI
-    from commands import admin_cli
     app.cli.add_command(admin_cli)
+    
+    
+    # Маршрут для webhookа
+    @app.route('/webhook', methods=['POST'])
+    def webhook():
+        try:
+            data = request.get_json()
+
+            if not data or 'transaction_id' not in data or 'status' not in data:
+                return jsonify({'error': 'Не верно переданы данные или отсутствуют!'}), 400
+
+            # Обработка вебхука
+            print(f"Получен вебхук: {data}")
+            return jsonify({'message': 'Webhook доставлен!'}), 200
+        except Exception as e:
+            return jsonify({'error': 'Ошибка на сервере!'}), 500
     
     # Маршрут для логина
     @app.route('/login', methods=['GET', 'POST'])
@@ -89,7 +104,6 @@ def create_app():
         setup_admin(admin, db)
 
     return app
-
 
 
 if __name__ == '__main__':

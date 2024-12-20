@@ -1,11 +1,11 @@
 from flask_admin.contrib.sqla import ModelView, filters
 from flask_login import current_user
-from flask import redirect, url_for
+from flask import redirect, url_for, flash, request
 from flask_admin import Admin, expose, base
 from wtforms import SelectField
 from datetime import datetime
 
-from models import User, Transaction, db
+from models import User, Transaction, db, TaskSchedule
 
 
 CHOISE_STATUS = [
@@ -20,25 +20,41 @@ CHOISE_ROLE = [
     ('regular', 'Regular'),
     ]
 
+
 class DashboardView(base.BaseView):
     @expose('/')
     def index(self):
-        # Получаем количество пользователей
         user_count = User.query.count()
-        
-        # Получаем количество транзакций
         transaction_count = Transaction.query.count()
-        
-        # Получаем сумму транзакций за текущий день
         today = datetime.today().date()
         daily_total = db.session.query(db.func.sum(Transaction.amount)).filter(db.func.date(Transaction.created_at) == today).scalar() or 0.0
-        
-        # Получаем последние транзакции
         last_transactions = Transaction.query.order_by(Transaction.created_at.desc()).limit(5).all()
         
-        # Отображаем данные в шаблоне
-        return self.render('admin/dashboard.html', user_count=user_count, transaction_count=transaction_count, 
-                           daily_total=daily_total, last_transactions=last_transactions)
+        refresh_intervals = [0, 10, 15, 30, 60]
+
+        task_schedule = TaskSchedule.query.first()
+        if not task_schedule:
+            task_schedule = TaskSchedule(interval_seconds=refresh_intervals[0])
+            db.session.add(task_schedule)
+            db.session.commit()
+        
+        selected_interval = task_schedule.interval_seconds
+        
+        new_interval = request.args.get('refresh_interval')
+        if new_interval and new_interval.isdigit() and int(new_interval) in refresh_intervals:
+            task_schedule.interval_seconds = int(new_interval)
+            db.session.commit()
+            selected_interval = int(new_interval)
+            flash('Интервал обновления успешно обновлен.', 'success')
+        
+        return self.render('admin/dashboard.html',
+                           user_count=user_count,
+                           transaction_count=transaction_count, 
+                           daily_total=daily_total,
+                           last_transactions=last_transactions,
+                           refresh_intervals=refresh_intervals,
+                           selected_interval=selected_interval
+                           )
 
 
 class BaseModelView(ModelView):
@@ -51,34 +67,30 @@ class BaseModelView(ModelView):
 
 class UserAdmin(BaseModelView):
     column_list = ['username', 'role', 'balance', 'commission_rate', 'webhook_url']
-
     can_create = False
     can_edit = True
     can_delete = True
-    
     form_excluded_columns = ['password_hash']
-    
     form_overrides = {
         'role': SelectField
     }
-    
     form_args = {
         'role': {
             'choices': CHOISE_ROLE
         }
     }
     
-    # Фильтрация пользователей для обычных пользователей (REGULAR)
+    # Фильтрация пользователей для обычных пользователей
     def get_query(self):
         if current_user.role == 'admin':
-            return super().get_query()  # Для администратора - все пользователи
-        return super().get_query().filter(User.id == current_user.id)  # Для обычного пользователя - только свой
+            return super().get_query()
+        return super().get_query().filter(User.id == current_user.id) 
 
     # Для правильного отображения количества записей в таблице
     def get_count_query(self):
         if current_user.role == 'admin':
-            return super().get_count_query()  # Для администратора - все пользователи
-        return super().get_count_query().filter(User.id == current_user.id)  # Для обычного пользователя - только свой
+            return super().get_count_query()  
+        return super().get_count_query().filter(User.id == current_user.id)
 
 
 class UserFilter(filters.BaseSQLAFilter):
@@ -102,7 +114,6 @@ class StatusFilter(filters.BaseSQLAFilter):
         return 'equals'
 
     def get_options(self, view):
-        # Опции статусов
         return CHOISE_STATUS
 
 
@@ -136,20 +147,21 @@ class TransactionAdmin(BaseModelView):
                 raise Exception("Пользователь не аутентифицирован. Невозможно установить user_id.")
         return super().on_model_change(form, model, is_created)
     
-    # Фильтрация транзакций для обычных пользователей (REGULAR)
+    # Фильтрация транзакций для обычных пользователей
     def get_query(self):
         if current_user.role == 'admin':
-            return super().get_query()  # Для администратора - все транзакции
-        return super().get_query().filter(Transaction.user_id == current_user.id)  # Для обычного пользователя - только свои транзакции
+            return super().get_query()
+        return super().get_query().filter(Transaction.user_id == current_user.id)
 
     # Для правильного отображения количества записей в таблице
     def get_count_query(self):
         if current_user.role == 'admin':
-            return super().get_count_query()  # Для администратора - все транзакции
-        return super().get_count_query().filter(Transaction.user_id == current_user.id)  # Для обычного пользователя - только свои транзакции
+            return super().get_count_query()
+        return super().get_count_query().filter(Transaction.user_id == current_user.id)
     
 
 admin = Admin(template_mode='bootstrap4', name='Админка')
+
 
 def setup_admin(admin, db):
     admin.add_view(DashboardView(name='Dashboard', endpoint='dashboard'))
