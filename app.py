@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, login_user
+from flasgger import Swagger
 
 from models import User, db
 from admin import admin, setup_admin
@@ -24,7 +25,10 @@ def create_app():
 
     # Регистрация модулей
     from api import api_blueprint
-    app.register_blueprint(api_blueprint)
+    app.register_blueprint(api_blueprint, url_prefix='/api')
+    
+    # Инициализация Swagger
+    Swagger(app)
     
     # Регистрация команд CLI
     from commands import admin_cli

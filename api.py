@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required, login_user
+from flask_restx import Api, Resource, fields
 
 from models import Transaction, db, User
 
@@ -7,8 +8,38 @@ from models import Transaction, db, User
 api_blueprint = Blueprint('api', __name__)
 
 
-@api_blueprint.route('/api/login', methods=['POST'])
+@api_blueprint.route('/login', methods=['POST'])
 def login():
+    """
+    Авторизация пользователя.
+    ---
+    tags:
+      - Authentication
+    parameters:
+      - name: username
+        in: formData
+        type: string
+        required: true
+        description: Имя пользователя.
+      - name: password
+        in: formData
+        type: string
+        required: true
+        description: Пароль пользователя.
+    responses:
+      200:
+        description: Успешная авторизация.
+        schema:
+          type: object
+          properties:
+            success:
+              type: string
+              example: Welkam!
+      401:
+        description: Неверный логин или пароль.
+      400:
+        description: Ошибка запроса.
+    """
     username = request.form.get('username')
     password = request.form.get('password')
     try:
@@ -22,15 +53,56 @@ def login():
         return jsonify({"error": f"{e}"}), 400
 
 
-@api_blueprint.route('/api/create_transaction', methods=['POST'])
+@api_blueprint.route('/create_transaction', methods=['POST'])
 @login_required
 def create_transaction():
     """
     Создание транзакции с автоматическим расчетом комиссии.
-    {
-        "amount": 100.0
-    }
-    """
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - name: amount
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            amount:
+              type: number
+              example: 100.0
+    responses:
+      201:
+        description: Транзакция успешно создана
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Транзакция создана
+            transaction:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                amount:
+                  type: number
+                  example: 100.0
+                username:
+                  type: string
+                  example: Admin
+                commission:
+                  type: number
+                  example: 10.0
+                status:
+                  type: string
+                  example: pending
+      400:
+        description: Ошибка ввода данных
+      500:
+        description: Внутренняя ошибка сервера
+    """ 
     data = request.get_json()
     if not data or 'amount' not in data:
         return jsonify({"error": "Сумма(amount) не передана"}), 400
@@ -57,6 +129,7 @@ def create_transaction():
             "transaction": {
                 "id": transaction.id,
                 "amount": transaction.amount,
+                "user": transaction.user.username,
                 "commission": transaction.commission,
                 "status": transaction.status
             }
@@ -65,14 +138,48 @@ def create_transaction():
         return jsonify({"error": str(e)}), 500
 
 
-@api_blueprint.route('/api/cancel_transaction', methods=['POST'])
+@api_blueprint.route('/cancel_transaction', methods=['POST'])
 @login_required
 def cancel_transaction():
     """
-    Отмена транзакции
-    {
-        "id": 1
-    }
+    Отмена транзакции.
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - name: id
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+    responses:
+      200:
+        description: Транзакция успешно отменена.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Транзакция отменена!
+            transaction:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                status:
+                  type: string
+                  example: canceled
+      400:
+        description: ID Транзакции не передан.
+      404:
+        description: Транзакция не найдена.
+      500:
+        description: Внутренняя ошибка сервера.
     """
     data = request.get_json()
     if not data or 'id' not in data:
@@ -101,12 +208,45 @@ def cancel_transaction():
         return jsonify({"error": str(e)}), 500
 
 
-@api_blueprint.route('/api/check_transaction', methods=['GET'])
+@api_blueprint.route('/check_transaction', methods=['GET'])
 @login_required
 def check_transactions():
     """
-    Получение списка транзакций для текущего пользователя.
-    Администратор видит все транзакции, обычный пользователь - только свои.
+    Получение списка транзакций.
+    ---
+    tags:
+      - Transactions
+    responses:
+      200:
+        description: Список транзакций.
+        schema:
+          type: object
+          properties:
+            transactions:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 1
+                  user:
+                    type: string
+                    example: Admin
+                  amount:
+                    type: number
+                    example: 100.0
+                  commission:
+                    type: number
+                    example: 10.0
+                  status:
+                    type: string
+                    example: pending
+                  created_at:
+                    type: string
+                    example: "2024-12-20T10:30:00"
+      500:
+        description: Внутренняя ошибка сервера.
     """
     try:
         # Определяем, какие транзакции возвращать
